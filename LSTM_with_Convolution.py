@@ -9,7 +9,7 @@ import os
 import numpy as np
 import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 
-from keras.layers import Dense, Input, LSTM, Bidirectional, Activation, Conv1D, GRU
+from keras.layers import Dense, Input, Bidirectional, Activation, Conv1D, GRU
 from keras.callbacks import Callback
 from keras.layers import Dropout, Embedding, GlobalMaxPooling1D, MaxPooling1D, Add, Flatten
 from keras.preprocessing import text, sequence
@@ -64,7 +64,8 @@ x_test = sequence.pad_sequences(X_test, maxlen=maxlen)
 
 
 '''
-    词嵌入: 一般用矩阵分解方法、基于浅窗口的方法
+    词嵌入(词向量): 将词的语义映射到向量空间中;
+    词向量通过降维技术表征文本数据集中的词的共现信息，一般用矩阵分解方法、基于浅窗口的方法；
     glove:  词向量工具 (Global Vectors for Word Representation)
     glove.840B.300d.txt 是词典文件，包含词及词对应的词向量，根据词汇的共现信息，将词汇编码成一个向量
 '''
@@ -96,16 +97,20 @@ sequence_input = Input(shape=(maxlen, ))        # 返回一个张量
 x = Embedding(max_features, embed_size, weights=[embedding_matrix], trainable=False)(sequence_input)
 x = SpatialDropout1D(0.2)(x)
 x = Bidirectional(GRU(128, return_sequences=True, dropout=0.1, recurrent_dropout=0.1))(x)
-x = Conv1D(64, kernel_size=3, padding="valid", kernel_initializer="glorot_uniform")(x)
+# 1D 卷积层 (例如时序卷积); filters：输出空间的维度（即卷积中滤波器的输出数量）; kernel_size：指明 1D 卷积窗口的长度;
+# valid：表示不填充；glorot_uniform：均匀分布初始化器；
+x = Conv1D(filters=64, kernel_size=3, padding="valid", kernel_initializer="glorot_uniform")(x)
+# GlobalAveragePooling1D()：对于时序数据的全局平均池化；GlobalMaxPooling1D()：对于时序数据的全局最大池化
 avg_pool = GlobalAveragePooling1D()(x)
 max_pool = GlobalMaxPooling1D()(x)
 x = concatenate([avg_pool, max_pool])
 preds = Dense(6, activation="sigmoid")(x)
 model = Model(sequence_input, preds)
 model.compile(loss='binary_crossentropy', optimizer=Adam(lr=1e-3), metrics=['accuracy'])
+model.summary()
 plot_model(model, to_file='Network.svg', show_shapes=True)
 # train_test_split: 将样本数据切分为训练集和测试集 (交叉验证)
-X_tra, X_val, y_tra, y_val = train_test_split(x_train, y_train, train_size=0.9, random_state=233)
+X_tra, X_val, y_tra, y_val = train_test_split(x_train, y_train, train_size=0.9, random_state=42)
 
 
 class RocAucEvaluation(Callback):
